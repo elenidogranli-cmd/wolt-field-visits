@@ -1,17 +1,16 @@
 import React, { useEffect, useMemo, useState } from "react";
 
+// NOTE: Pure JavaScript (no TypeScript annotations) so it runs in plain browsers
+
 // Helpers
 const uid = () => Math.random().toString(36).slice(2, 9);
 const todayISO = () => new Date().toISOString().slice(0, 10);
-function save(key: string, value: any) { localStorage.setItem(key, JSON.stringify(value)); }
-function load<T>(key: string, fallback: T): T { try { const v = JSON.parse(localStorage.getItem(key) as any); return (v ?? fallback) as T; } catch { return fallback; } }
+function save(key, value) { localStorage.setItem(key, JSON.stringify(value)); }
+function load(key, fallback) { try { const v = JSON.parse(localStorage.getItem(key)); return v ?? fallback; } catch { return fallback; } }
 
 // ====== Navigation data (menu -> chains -> subchains) ======
-const CHAINS_ROOT = ["Μασούτης","Σκλαβενίτης"] as const;
-const MASOUTIS_SUBCHAINS = ["Μασούτης Αγγελάκη","Μασούτης Μακεδονίας"] as const;
-
-type NavLevel = "menu" | "chains" | "subchains" | "chain" | "subchain";
-interface NavState { level: NavLevel; chain?: string; sub?: string }
+const CHAINS_ROOT = ["Μασούτης","Σκλαβενίτης"];
+const MASOUTIS_SUBCHAINS = ["Μασούτης Αγγελάκη","Μασούτης Μακεδονίας"];
 
 // Defaults
 const DEFAULT_TEAM = [ { id: "eleni", name: "Eleni" }, { id: "member2", name: "Μέλος 2" }, { id: "member3", name: "Μέλος 3" }];
@@ -23,12 +22,10 @@ const HEADERS = [
   "needsFollowUp","followUp","storeManager","personnel","woltsPickers","staffsEngagement",
   "storeSize","storeLayout","internet","contactCustomers","devices","firmwareUpdate","problems",
   "status","assignedTo","createdAt","checkins"
-] as const;
+];
 
-type Visit = Record<(typeof HEADERS)[number], any> & { id: string };
-
-function toCSV(rows: Visit[]) {
-  const escape = (s: any) => String(s ?? "").replaceAll('"', '""').replace(/\n/g, " ");
+function toCSV(rows) {
+  const escape = (s) => String(s ?? "").replaceAll('"', '""').replace(/\n/g, " ");
   const lines = [HEADERS.join(",")].concat(
     rows.map((r) => HEADERS.map((h) => {
       const val = h === "checkins" ? JSON.stringify(r[h] ?? []) : r[h];
@@ -37,25 +34,25 @@ function toCSV(rows: Visit[]) {
   );
   return lines.join("\n");
 }
-function download(filename: string, text: string) { const blob = new Blob([text], { type: "text/csv;charset=utf-8;" }); const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = filename; link.click(); }
+function download(filename, text) { const blob = new Blob([text], { type: "text/csv;charset=utf-8;" }); const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = filename; link.click(); }
 
 // Speech recognition helper (simple)
 function getSpeechRecognition() {
-  const SR: any = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SR) return null;
   const rec = new SR(); rec.lang = "el-GR"; rec.interimResults = false; rec.maxAlternatives = 1; return rec;
 }
 
 export default function WoltFieldVisitsApp() {
   // ====== State
-  const [nav, setNav] = useState<NavState>({ level: "menu" });
+  const [nav, setNav] = useState({ level: "menu", chain: undefined, sub: undefined });
   const [team, setTeam] = useState(() => load("wfv_team", DEFAULT_TEAM));
-  const [visits, setVisits] = useState<Visit[]>(() => load("wfv_visits", []));
+  const [visits, setVisits] = useState(() => load("wfv_visits", []));
   const [filters, setFilters] = useState({ q: "", member: "", status: "", from: "", to: "", chain: "", follow: "" });
-  const [listeningField, setListeningField] = useState<string | null>(null);
+  const [listeningField, setListeningField] = useState(null);
 
   // form template tied to current nav scope
-  const blankBase: Visit = {
+  const blankBase = {
     id: "",
     chain: nav.chain || "",
     subChain: nav.sub || "",
@@ -79,11 +76,11 @@ export default function WoltFieldVisitsApp() {
     firmwareUpdate: "No",
     problems: "",
     status: "planned",
-    assignedTo: (team[0]?.id || "") as any,
+    assignedTo: team[0]?.id || "",
     createdAt: todayISO(),
     checkins: [],
-  } as Visit;
-  const [form, setForm] = useState<Visit>(blankBase);
+  };
+  const [form, setForm] = useState(blankBase);
   useEffect(() => { // sync scope -> form
     setForm((f) => ({ ...f, chain: nav.chain || "", subChain: nav.sub || "" }));
   }, [nav.chain, nav.sub]);
@@ -95,7 +92,7 @@ export default function WoltFieldVisitsApp() {
     const scopeChain = nav.chain || ""; const scopeSub = nav.sub || "";
     return visits
       .filter((v) => (scopeChain ? v.chain === scopeChain : true))
-      .filter((v) => (scopeSub ? (v as any).subChain === scopeSub : true))
+      .filter((v) => (scopeSub ? v.subChain === scopeSub : true))
       .filter((v) => (filters.q ? [v.venueName, v.venueCity, v.followUp, v.problems, v.storeManager].join(" ").toLowerCase().includes(filters.q.toLowerCase()) : true))
       .filter((v) => (filters.member ? v.assignedTo === filters.member : true))
       .filter((v) => (filters.status ? v.status === filters.status : true))
@@ -107,27 +104,26 @@ export default function WoltFieldVisitsApp() {
 
   function addVisit() {
     if (!form.chain) return alert("Διάλεξε αλυσίδα από το μενού.");
-    const v = { ...form, id: uid() } as Visit;
+    const v = { ...form, id: uid() };
     setVisits((prev) => [v, ...prev]);
     setForm({ ...blankBase, chain: nav.chain || "", subChain: nav.sub || "" });
   }
-  function updateVisit(id: string, patch: Partial<Visit>) { setVisits((prev) => prev.map((v) => (v.id === id ? { ...v, ...patch } : v))); }
-  function removeVisit(id: string) { if (!confirm("Να διαγραφεί;")) return; setVisits((prev) => prev.filter((v) => v.id !== id)); }
+  function updateVisit(id, patch) { setVisits((prev) => prev.map((v) => (v.id === id ? { ...v, ...patch } : v))); }
+  function removeVisit(id) { if (!confirm("Να διαγραφεί;")) return; setVisits((prev) => prev.filter((v) => v.id !== id)); }
   function exportCSV() { download(`wolt-field-visits-${todayISO()}.csv`, toCSV(visits)); }
-  function importCSV(file: File) {
+  function importCSV(file) {
     const reader = new FileReader();
     reader.onload = () => {
       try {
         const text = String(reader.result);
         const [headerLine, ...lines] = text.split(/\r?\n/).filter(Boolean);
         const heads = headerLine.split(",").map((h) => h.replace(/(^\"|\"$)/g, ""));
-        const parse = (s: string) => s.replace(/(^\"|\"$)/g, "").replaceAll('""', '"');
+        const parse = (s) => s.replace(/(^\"|\"$)/g, "").replaceAll('""', '"');
         const rows = lines.map((line) => {
           const cols = line.match(/\"(?:[^\"]|\"\")*\"|[^,]+/g) || [];
-          const o: any = {};
-          heads.forEach((h, i) => (o[h] = parse(cols[i] ?? "")));
+          const o = {}; heads.forEach((h, i) => (o[h] = parse(cols[i] ?? "")));
           try { o.checkins = JSON.parse(o.checkins || "[]"); } catch { o.checkins = []; }
-          return o as Visit;
+          return o;
         });
         setVisits(rows.map((r) => ({ ...r, id: r.id || uid(), staffsEngagement: Number(r.staffsEngagement || 3) })));
         alert("OK: CSV εισήχθη.");
@@ -136,25 +132,24 @@ export default function WoltFieldVisitsApp() {
     reader.readAsText(file);
   }
 
-  // Dictation controls (kept for later forms)
-  function startDictation(target: "problems" | "followUp") {
-    const SR: any = getSpeechRecognition();
+  // Dictation controls (optional)
+  function startDictation(target) {
+    const SR = getSpeechRecognition();
     if (!SR) { alert("Ο browser δεν υποστηρίζει φωνητική εισαγωγή."); return; }
     const rec = SR; setListeningField(target);
-    rec.onresult = (e: any) => { const text = e.results[0][0].transcript; setForm((f:any) => ({ ...f, [target]: (f[target] ? f[target] + ' ' : '') + text })); };
+    rec.onresult = (e) => { const text = e.results[0][0].transcript; setForm((f) => ({ ...f, [target]: (f[target] ? f[target] + ' ' : '') + text })); };
     rec.onend = () => setListeningField(null); rec.start();
   }
 
-  // Check-in with geolocation (kept)
-  function doCheckIn(v: Visit) {
-    const stamp: any = { ts: new Date().toISOString(), lat: null, lon: null };
-    const apply = (s:any) => updateVisit(v.id, { checkins: [ ...(v.checkins||[]), s ] } as any);
+  // Check-in with geolocation
+  function doCheckIn(v) {
+    const stamp = { ts: new Date().toISOString(), lat: null, lon: null };
+    const apply = (s) => updateVisit(v.id, { checkins: [ ...(v.checkins||[]), s ] });
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition((pos) => { stamp.lat = pos.coords.latitude; stamp.lon = pos.coords.longitude; apply(stamp); }, () => apply(stamp), { enableHighAccuracy: true, timeout: 5000 });
     } else apply(stamp);
   }
 
-  // ============ UI ============
   const scopeLabel = nav.sub || nav.chain || "Κανένα";
 
   return (
@@ -206,7 +201,7 @@ export default function WoltFieldVisitsApp() {
           <div className="flex gap-2">
             <button onClick={exportCSV} className="rounded-xl px-3 py-2 shadow bg-white text-xs">Εξαγωγή CSV</button>
             <label className="rounded-xl px-3 py-2 shadow bg-white text-xs cursor-pointer">Εισαγωγή CSV
-              <input type="file" accept=".csv" className="hidden" onChange={(e) => e.target.files?.[0] && importCSV(e.target.files[0] as File)} />
+              <input type="file" accept=".csv" className="hidden" onChange={(e) => e.target.files?.[0] && importCSV(e.target.files[0])} />
             </label>
           </div>
         </header>
@@ -215,22 +210,22 @@ export default function WoltFieldVisitsApp() {
         {(nav.level === "chain" || nav.level === "subchain") && (
           <section className="mb-4 rounded-2xl bg-white p-3 shadow">
             <div className="grid grid-cols-2 md:grid-cols-6 gap-2">
-              <Input label="Αναζήτηση" value={filters.q} onChange={(e:any) => setFilters({ ...filters, q: e.target.value })} />
-              <Select label="Μέλος" value={filters.member} onChange={(e:any) => setFilters({ ...filters, member: e.target.value })}>
+              <Input label="Αναζήτηση" value={filters.q} onChange={(e) => setFilters({ ...filters, q: e.target.value })} />
+              <Select label="Μέλος" value={filters.member} onChange={(e) => setFilters({ ...filters, member: e.target.value })}>
                 <option value="">Όλα</option>
                 {team.map((t) => (<option key={t.id} value={t.id}>{t.name}</option>))}
               </Select>
-              <Select label="Κατάσταση" value={filters.status} onChange={(e:any) => setFilters({ ...filters, status: e.target.value })}>
+              <Select label="Κατάσταση" value={filters.status} onChange={(e) => setFilters({ ...filters, status: e.target.value })}>
                 <option value="">Όλες</option>
                 {DEFAULT_STATUSES.map((s) => (<option key={s.id} value={s.id}>{s.label}</option>))}
               </Select>
-              <Select label="Follow Up" value={filters.follow} onChange={(e:any) => setFilters({ ...filters, follow: e.target.value })}>
+              <Select label="Follow Up" value={filters.follow} onChange={(e) => setFilters({ ...filters, follow: e.target.value })}>
                 <option value="">Όλα</option>
                 <option value="Yes">Yes</option>
                 <option value="No">No</option>
               </Select>
-              <Input label="Από" type="date" value={filters.from} onChange={(e:any) => setFilters({ ...filters, from: e.target.value })} />
-              <Input label="Έως" type="date" value={filters.to} onChange={(e:any) => setFilters({ ...filters, to: e.target.value })} />
+              <Input label="Από" type="date" value={filters.from} onChange={(e) => setFilters({ ...filters, from: e.target.value })} />
+              <Input label="Έως" type="date" value={filters.to} onChange={(e) => setFilters({ ...filters, to: e.target.value })} />
             </div>
           </section>
         )}
@@ -272,7 +267,7 @@ export default function WoltFieldVisitsApp() {
           <h2 className="mb-2 text-base font-semibold">Ομάδα</h2>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
             {team.map((m, i) => (
-              <Input key={m.id} label={`Μέλος ${i + 1}`} value={m.name} onChange={(e:any) => setTeam(team.map((t) => (t.id === m.id ? { ...t, name: e.target.value } : t)))} />
+              <Input key={m.id} label={`Μέλος ${i + 1}`} value={m.name} onChange={(e) => setTeam(team.map((t) => (t.id === m.id ? { ...t, name: e.target.value } : t)))} />
             ))}
           </div>
         </section>
@@ -282,49 +277,49 @@ export default function WoltFieldVisitsApp() {
 }
 
 // === Reusable form ===
-function VisitForm({ form, setForm, onSave, team, statuses, labelPrefix, startDictation, listeningField }: any){
+function VisitForm({ form, setForm, onSave, team, statuses, labelPrefix, startDictation, listeningField }){
   return (
     <section className="mb-6 rounded-2xl bg-white p-3 shadow">
       <h2 className="mb-2 text-base font-semibold">{labelPrefix} — Νέα επίσκεψη</h2>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <Input label="Αλυσίδα" value={form.chain} readOnly />
         <Input label="Υποκατηγορία" value={form.subChain || "—"} readOnly />
-        <Input label="Venue Name" value={form.venueName} onChange={(e:any) => setForm({ ...form, venueName: e.target.value })} />
-        <Input label="Venue City" value={form.venueCity} onChange={(e:any) => setForm({ ...form, venueCity: e.target.value })} />
-        <Input label="OSS Owner Name" value={form.ossOwnerName} onChange={(e:any) => setForm({ ...form, ossOwnerName: e.target.value })} />
-        <Select label="Efood" value={form.efood} onChange={(e:any) => setForm({ ...form, efood: e.target.value })}>
+        <Input label="Venue Name" value={form.venueName} onChange={(e) => setForm({ ...form, venueName: e.target.value })} />
+        <Input label="Venue City" value={form.venueCity} onChange={(e) => setForm({ ...form, venueCity: e.target.value })} />
+        <Input label="OSS Owner Name" value={form.ossOwnerName} onChange={(e) => setForm({ ...form, ossOwnerName: e.target.value })} />
+        <Select label="Efood" value={form.efood} onChange={(e) => setForm({ ...form, efood: e.target.value })}>
           <option>No</option><option>Yes</option>
         </Select>
-        <Input label="Training Owner" value={form.trainingOwner} onChange={(e:any) => setForm({ ...form, trainingOwner: e.target.value })} />
-        <Input label="Visit Date" type="date" value={form.visitDate} onChange={(e:any) => setForm({ ...form, visitDate: e.target.value })} />
-        <Select label="Needs Follow Up" value={form.needsFollowUp} onChange={(e:any) => setForm({ ...form, needsFollowUp: e.target.value })}>
+        <Input label="Training Owner" value={form.trainingOwner} onChange={(e) => setForm({ ...form, trainingOwner: e.target.value })} />
+        <Input label="Visit Date" type="date" value={form.visitDate} onChange={(e) => setForm({ ...form, visitDate: e.target.value })} />
+        <Select label="Needs Follow Up" value={form.needsFollowUp} onChange={(e) => setForm({ ...form, needsFollowUp: e.target.value })}>
           <option>No</option><option>Yes</option>
         </Select>
-        <Input label="Follow Up" value={form.followUp} onChange={(e:any) => setForm({ ...form, followUp: e.target.value })} />
-        <Input label="Store Manager" value={form.storeManager} onChange={(e:any) => setForm({ ...form, storeManager: e.target.value })} />
-        <Input label="Personnel" value={form.personnel} onChange={(e:any) => setForm({ ...form, personnel: e.target.value })} />
-        <Input label="Wolt's Pickers" value={form.woltsPickers} onChange={(e:any) => setForm({ ...form, woltsPickers: e.target.value })} />
-        <Range label={`Staff's Engagement (${form.staffsEngagement})`} min={1} max={5} value={form.staffsEngagement} onChange={(e:any) => setForm({ ...form, staffsEngagement: Number(e.target.value) })} />
-        <Input label="Store Size" value={form.storeSize} onChange={(e:any) => setForm({ ...form, storeSize: e.target.value })} />
-        <Input label="Store Layout" value={form.storeLayout} onChange={(e:any) => setForm({ ...form, storeLayout: e.target.value })} />
-        <Input label="Internet" value={form.internet} onChange={(e:any) => setForm({ ...form, internet: e.target.value })} />
-        <Select label="Contact Customers" value={form.contactCustomers} onChange={(e:any) => setForm({ ...form, contactCustomers: e.target.value })}>
+        <Input label="Follow Up" value={form.followUp} onChange={(e) => setForm({ ...form, followUp: e.target.value })} />
+        <Input label="Store Manager" value={form.storeManager} onChange={(e) => setForm({ ...form, storeManager: e.target.value })} />
+        <Input label="Personnel" value={form.personnel} onChange={(e) => setForm({ ...form, personnel: e.target.value })} />
+        <Input label="Wolt's Pickers" value={form.woltsPickers} onChange={(e) => setForm({ ...form, woltsPickers: e.target.value })} />
+        <Range label={`Staff's Engagement (${form.staffsEngagement})`} min={1} max={5} value={form.staffsEngagement} onChange={(e) => setForm({ ...form, staffsEngagement: Number(e.target.value) })} />
+        <Input label="Store Size" value={form.storeSize} onChange={(e) => setForm({ ...form, storeSize: e.target.value })} />
+        <Input label="Store Layout" value={form.storeLayout} onChange={(e) => setForm({ ...form, storeLayout: e.target.value })} />
+        <Input label="Internet" value={form.internet} onChange={(e) => setForm({ ...form, internet: e.target.value })} />
+        <Select label="Contact Customers" value={form.contactCustomers} onChange={(e) => setForm({ ...form, contactCustomers: e.target.value })}>
           <option>No</option><option>Yes</option>
         </Select>
-        <Input label="Devices" value={form.devices} onChange={(e:any) => setForm({ ...form, devices: e.target.value })} />
-        <Select label="Firmware Update" value={form.firmwareUpdate} onChange={(e:any) => setForm({ ...form, firmwareUpdate: e.target.value })}>
+        <Input label="Devices" value={form.devices} onChange={(e) => setForm({ ...form, devices: e.target.value })} />
+        <Select label="Firmware Update" value={form.firmwareUpdate} onChange={(e) => setForm({ ...form, firmwareUpdate: e.target.value })}>
           <option>No</option><option>Yes</option>
         </Select>
-        <Textarea label="Problems" value={form.problems} onChange={(e:any) => setForm({ ...form, problems: e.target.value })} />
+        <Textarea label="Problems" value={form.problems} onChange={(e) => setForm({ ...form, problems: e.target.value })} />
         <div className="flex gap-2">
           <button type="button" onClick={() => startDictation("problems")} className={`rounded-xl border px-3 py-2 text-xs ${listeningField==="problems"?"bg-blue-50":""}`}>🎤 Προβλήματα</button>
           <button type="button" onClick={() => startDictation("followUp")} className={`rounded-xl border px-3 py-2 text-xs ${listeningField==="followUp"?"bg-blue-50":""}`}>🎤 Follow up</button>
         </div>
-        <Select label="Κατάσταση" value={form.status} onChange={(e:any) => setForm({ ...form, status: e.target.value })}>
-          {statuses.map((s:any) => (<option key={s.id} value={s.id}>{s.label}</option>))}
+        <Select label="Κατάσταση" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
+          {DEFAULT_STATUSES.map((s) => (<option key={s.id} value={s.id}>{s.label}</option>))}
         </Select>
-        <Select label="Μέλος ομάδας" value={form.assignedTo} onChange={(e:any) => setForm({ ...form, assignedTo: e.target.value })}>
-          {team.map((t:any) => (<option key={t.id} value={t.id}>{t.name}</option>))}
+        <Select label="Μέλος ομάδας" value={form.assignedTo} onChange={(e) => setForm({ ...form, assignedTo: e.target.value })}>
+          {team.map((t) => (<option key={t.id} value={t.id}>{t.name}</option>))}
         </Select>
       </div>
       <div className="mt-3 flex justify-end">
@@ -335,14 +330,14 @@ function VisitForm({ form, setForm, onSave, team, statuses, labelPrefix, startDi
 }
 
 // UI atoms
-function Input({ label, className = "", ...props }: any) { return (<label className={`block ${className}`}><span className="mb-1 block text-sm font-medium text-gray-700">{label}</span><input {...props} className="w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200" /></label>); }
-function Textarea({ label, className = "", ...props }: any) { return (<label className={`block ${className}`}><span className="mb-1 block text-sm font-medium text-gray-700">{label}</span><textarea {...props} rows={4} className="w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200" /></label>); }
-function Select({ label, children, className = "", ...props }: any) { return (<label className={`block ${className}`}><span className="mb-1 block text-sm font-medium text-gray-700">{label}</span><select {...props} className="w-full rounded-xl border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200">{children}</select></label>); }
-function Range({ label, className = "", ...props }: any) { return (<label className={`block ${className}`}><span className="mb-1 block text-sm font-medium text-gray-700">{label}</span><input type="range" {...props} className="w-full" /></label>); }
-function Badge({ children }: any) { return <span className="rounded-full bg-gray-100 px-2 py-1 text-xs">{children}</span>; }
+function Input({ label, className = "", ...props }) { return (<label className={`block ${className}`}><span className="mb-1 block text-sm font-medium text-gray-700">{label}</span><input {...props} className="w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200" /></label>); }
+function Textarea({ label, className = "", ...props }) { return (<label className={`block ${className}`}><span className="mb-1 block text-sm font-medium text-gray-700">{label}</span><textarea {...props} rows={4} className="w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200" /></label>); }
+function Select({ label, children, className = "", ...props }) { return (<label className={`block ${className}`}><span className="mb-1 block text-sm font-medium text-gray-700">{label}</span><select {...props} className="w-full rounded-xl border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200">{children}</select></label>); }
+function Range({ label, className = "", ...props }) { return (<label className={`block ${className}`}><span className="mb-1 block text-sm font-medium text-gray-700">{label}</span><input type="range" {...props} className="w-full" /></label>); }
+function Badge({ children }) { return <span className="rounded-full bg-gray-100 px-2 py-1 text-xs">{children}</span>; }
 
-function VisitCard({ v, team, onUpdate, onRemove, onCheckIn }: any) {
-  const memberName = team.find((t: any) => t.id === v.assignedTo)?.name || "—";
+function VisitCard({ v, team, onUpdate, onRemove, onCheckIn }) {
+  const memberName = team.find((t) => t.id === v.assignedTo)?.name || "—";
   const lastCheck = (v.checkins && v.checkins[v.checkins.length-1]) || null;
   return (
     <div className="rounded-2xl border p-3 shadow-sm">
@@ -353,7 +348,7 @@ function VisitCard({ v, team, onUpdate, onRemove, onCheckIn }: any) {
           <div className="text-xs text-gray-600">{v.venueCity}</div>
         </div>
         <div className="flex items-center gap-2">
-          <select value={v.status} onChange={(e:any) => onUpdate(v.id, { status: e.target.value })} className="rounded-xl border px-2 py-1 text-xs">
+          <select value={v.status} onChange={(e) => onUpdate(v.id, { status: e.target.value })} className="rounded-xl border px-2 py-1 text-xs">
             {DEFAULT_STATUSES.map((s) => (<option key={s.id} value={s.id}>{s.label}</option>))}
           </select>
           <button onClick={() => onRemove(v.id)} className="rounded-xl border px-2 py-1 text-xs hover:bg-red-50">Διαγραφή</button>
