@@ -1,7 +1,5 @@
-// sw.js
-const CACHE_NAME = 'wfv-cache-v10'; // αυξάνει το version => καθαρίζει παλιές cache
+const CACHE_NAME = 'wfv-cache-v10';
 
-// ΜΟΝΟ τοπικά assets. Κανένα https://... από άλλους domains.
 const ASSETS = [
   '/', '/index.html', '/app.js', '/manifest.json',
   '/icons/icon-192.png', '/icons/icon-512.png'
@@ -25,11 +23,10 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// Network-first για σελίδες (HTML), cache-first για τοπικά static
+// Network-first για HTML, cache-first για local static
 self.addEventListener('fetch', (event) => {
   const req = event.request;
 
-  // Για πλοήγηση (HTML)
   if (req.mode === 'navigate') {
     event.respondWith(
       fetch(req).then((res) => {
@@ -42,8 +39,6 @@ self.addEventListener('fetch', (event) => {
   }
 
   const url = new URL(req.url);
-
-  // Μόνο same-origin αρχεία στην cache
   if (url.origin === self.location.origin) {
     event.respondWith(
       caches.match(req).then((cached) =>
@@ -55,5 +50,4 @@ self.addEventListener('fetch', (event) => {
       )
     );
   }
-  // Cross-origin: άστο να περάσει στο δίκτυο (δεν το cache-άρουμε)
 });
