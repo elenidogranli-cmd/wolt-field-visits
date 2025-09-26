@@ -1,6 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
-
-// NOTE: Pure JavaScript (no TypeScript annotations) so it runs in plain browsers
+// NOTE: Pure JavaScript (no TypeScript imports) so it runs in plain browsers
 
 // Helpers
 const uid = () => Math.random().toString(36).slice(2, 9);
@@ -26,6 +24,7 @@ const HEADERS = [
 ];
 
 function toCSV(rows) {
+  // ✅ FIX: σωστό regex για νέα γραμμή
   const escape = (s) => String(s ?? "").replaceAll('"', '""').replace(/\n/g, " ");
   const lines = [HEADERS.join(",")].concat(
     rows.map((r) => HEADERS.map((h) => {
@@ -33,6 +32,7 @@ function toCSV(rows) {
       return `"${escape(Array.isArray(val) ? val.join(";") : val)}"`;
     }).join(","))
   );
+  // ✅ FIX: σωστό join για γραμμές
   return lines.join("\n");
 }
 function download(filename, text) { const blob = new Blob([text], { type: "text/csv;charset=utf-8;" }); const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = filename; link.click(); }
@@ -46,11 +46,11 @@ function getSpeechRecognition() {
 
 function WoltFieldVisitsApp() {
   // ====== State
-  const [nav, setNav] = useState({ level: "menu", chain: undefined, sub: undefined });
-  const [team, setTeam] = useState(() => load("wfv_team", DEFAULT_TEAM));
-  const [visits, setVisits] = useState(() => load("wfv_visits", []));
-  const [filters, setFilters] = useState({ q: "", member: "", status: "", from: "", to: "", chain: "", follow: "" });
-  const [listeningField, setListeningField] = useState(null);
+  const [nav, setNav] = React.useState({ level: "menu", chain: undefined, sub: undefined });
+  const [team, setTeam] = React.useState(() => load("wfv_team", DEFAULT_TEAM));
+  const [visits, setVisits] = React.useState(() => load("wfv_visits", []));
+  const [filters, setFilters] = React.useState({ q: "", member: "", status: "", from: "", to: "", chain: "", follow: "" });
+  const [listeningField, setListeningField] = React.useState(null);
 
   // form template tied to current nav scope
   const blankBase = {
@@ -81,15 +81,15 @@ function WoltFieldVisitsApp() {
     createdAt: todayISO(),
     checkins: [],
   };
-  const [form, setForm] = useState(blankBase);
-  useEffect(() => { // sync scope -> form
+  const [form, setForm] = React.useState(blankBase);
+  React.useEffect(() => { // sync scope -> form
     setForm((f) => ({ ...f, chain: nav.chain || "", subChain: nav.sub || "" }));
   }, [nav.chain, nav.sub]);
 
-  useEffect(() => save("wfv_team", team), [team]);
-  useEffect(() => save("wfv_visits", visits), [visits]);
+  React.useEffect(() => save("wfv_team", team), [team]);
+  React.useEffect(() => save("wfv_visits", visits), [visits]);
 
-  const filtered = useMemo(() => {
+  const filtered = React.useMemo(() => {
     const scopeChain = nav.chain || ""; const scopeSub = nav.sub || "";
     return visits
       .filter((v) => (scopeChain ? v.chain === scopeChain : true))
@@ -117,6 +117,7 @@ function WoltFieldVisitsApp() {
     reader.onload = () => {
       try {
         const text = String(reader.result);
+        // ✅ FIX: σωστό split σε γραμμές
         const [headerLine, ...lines] = text.split(/\r?\n/).filter(Boolean);
         const heads = headerLine.split(",").map((h) => h.replace(/(^\"|\"$)/g, ""));
         const parse = (s) => s.replace(/(^\"|\"$)/g, "").replaceAll('""', '"');
@@ -385,5 +386,17 @@ function VisitCard({ v, team, onUpdate, onRemove, onCheckIn }) {
 
 function EmptyState() { return (<div className="rounded-2xl border border-dashed p-6 text-center text-sm text-gray-600">Δεν υπάρχουν εγγραφές.</div>); }
 
-// expose to window for index.html bootstrap if needed
+// Bootstrap: expose + auto-mount if ReactDOM exists
 window.WoltFieldVisitsApp = WoltFieldVisitsApp;
+(function autoMount(){
+  try {
+    if (!window.ReactDOM || !window.React || !WoltFieldVisitsApp) return;
+    var el = document.getElementById('root');
+    if (!el) { el = document.createElement('div'); el.id = 'root'; document.body.appendChild(el); }
+    if (window.ReactDOM.createRoot) {
+      window.ReactDOM.createRoot(el).render(React.createElement(WoltFieldVisitsApp));
+    } else if (window.ReactDOM.render) {
+      window.ReactDOM.render(React.createElement(WoltFieldVisitsApp), el);
+    }
+  } catch (e) { console.error('Auto-mount error', e); }
+})();
