@@ -1,4 +1,4 @@
-const CACHE_NAME = 'wfv-cache-v2';
+const CACHE_NAME = 'wfv-cache-v5';
 const ASSETS = [
   './','./index.html','./app.js','./manifest.json',
   './icons/icon-192.png','./icons/icon-512.png',
