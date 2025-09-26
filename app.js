@@ -11,6 +11,7 @@ function load(key, fallback) { try { const v = JSON.parse(localStorage.getItem(k
 // ====== Navigation data (menu -> chains -> subchains) ======
 const CHAINS_ROOT = ["Μασούτης","Σκλαβενίτης"];
 const MASOUTIS_SUBCHAINS = ["Μασούτης Αγγελάκη","Μασούτης Μακεδονίας"];
+const SKLAVENITIS_SUBCHAINS = ["Σκλαβενίτης Αγγελάκη","Σκλαβενίτης Μακεδονίας"];
 
 // Defaults
 const DEFAULT_TEAM = [ { id: "eleni", name: "Eleni" }, { id: "member2", name: "Μέλος 2" }, { id: "member3", name: "Μέλος 3" }];
@@ -43,7 +44,7 @@ function getSpeechRecognition() {
   const rec = new SR(); rec.lang = "el-GR"; rec.interimResults = false; rec.maxAlternatives = 1; return rec;
 }
 
-export default function WoltFieldVisitsApp() {
+function WoltFieldVisitsApp() {
   // ====== State
   const [nav, setNav] = useState({ level: "menu", chain: undefined, sub: undefined });
   const [team, setTeam] = useState(() => load("wfv_team", DEFAULT_TEAM));
@@ -177,7 +178,7 @@ export default function WoltFieldVisitsApp() {
           {nav.level === "chains" && (
             <>
               {CHAINS_ROOT.map((ch) => (
-                <button key={ch} onClick={() => setNav(ch === "Μασούτης" ? { level: "subchains", chain: ch } : { level: "chain", chain: ch })} className="w-full text-left px-3 py-2 rounded-xl hover:bg-gray-50">{ch}</button>
+                <button key={ch} onClick={() => setNav({ level: "subchains", chain: ch })} className="w-full text-left px-3 py-2 rounded-xl hover:bg-gray-50">{ch}</button>
               ))}
             </>
           )}
@@ -186,6 +187,13 @@ export default function WoltFieldVisitsApp() {
             <>
               {MASOUTIS_SUBCHAINS.map((s) => (
                 <button key={s} onClick={() => setNav({ level: "subchain", chain: "Μασούτης", sub: s.replace("Μασούτης ", "") })} className="w-full text-left px-3 py-2 rounded-xl hover:bg-gray-50">{s}</button>
+              ))}
+            </>
+          )}
+          {nav.level === "subchains" && nav.chain === "Σκλαβενίτης" && (
+            <>
+              {SKLAVENITIS_SUBCHAINS.map((s) => (
+                <button key={s} onClick={() => setNav({ level: "subchain", chain: "Σκλαβενίτης", sub: s.replace("Σκλαβενίτης ", "") })} className="w-full text-left px-3 py-2 rounded-xl hover:bg-gray-50">{s}</button>
               ))}
             </>
           )}
@@ -235,15 +243,17 @@ export default function WoltFieldVisitsApp() {
           <div className="rounded-2xl border border-dashed p-6 text-center text-sm text-gray-600">Διάλεξε «Αλυσίδες» από το αριστερό μενού.</div>
         )}
 
-        {nav.level === "chain" && nav.chain === "Σκλαβενίτης" && (
-          <VisitForm form={form} setForm={setForm} onSave={addVisit} team={team} statuses={DEFAULT_STATUSES} labelPrefix="Σκλαβενίτης" startDictation={startDictation} listeningField={listeningField} />
-        )}
-
         {nav.level === "subchain" && nav.chain === "Μασούτης" && nav.sub === "Αγγελάκη" && (
           <VisitForm form={form} setForm={setForm} onSave={addVisit} team={team} statuses={DEFAULT_STATUSES} labelPrefix="Μασούτης Αγγελάκη" startDictation={startDictation} listeningField={listeningField} />
         )}
         {nav.level === "subchain" && nav.chain === "Μασούτης" && nav.sub === "Μακεδονίας" && (
           <VisitForm form={form} setForm={setForm} onSave={addVisit} team={team} statuses={DEFAULT_STATUSES} labelPrefix="Μασούτης Μακεδονίας" startDictation={startDictation} listeningField={listeningField} />
+        )}
+        {nav.level === "subchain" && nav.chain === "Σκλαβενίτης" && nav.sub === "Αγγελάκη" && (
+          <VisitForm form={form} setForm={setForm} onSave={addVisit} team={team} statuses={DEFAULT_STATUSES} labelPrefix="Σκλαβενίτης Αγγελάκη" startDictation={startDictation} listeningField={listeningField} />
+        )}
+        {nav.level === "subchain" && nav.chain === "Σκλαβενίτης" && nav.sub === "Μακεδονίας" && (
+          <VisitForm form={form} setForm={setForm} onSave={addVisit} team={team} statuses={DEFAULT_STATUSES} labelPrefix="Σκλαβενίτης Μακεδονίας" startDictation={startDictation} listeningField={listeningField} />
         )}
 
         {/* List */}
@@ -374,3 +384,6 @@ function VisitCard({ v, team, onUpdate, onRemove, onCheckIn }) {
 }
 
 function EmptyState() { return (<div className="rounded-2xl border border-dashed p-6 text-center text-sm text-gray-600">Δεν υπάρχουν εγγραφές.</div>); }
+
+// expose to window for index.html bootstrap if needed
+window.WoltFieldVisitsApp = WoltFieldVisitsApp;
