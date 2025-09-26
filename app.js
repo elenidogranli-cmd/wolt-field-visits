@@ -1,4 +1,4 @@
-// NOTE: Pure JavaScript (no TypeScript imports) so it runs in plain browsers
+// NOTE: Pure JavaScript (no imports) so it runs in any browser with React UMD
 
 // Helpers
 const uid = () => Math.random().toString(36).slice(2, 9);
@@ -25,7 +25,8 @@ const HEADERS = [
 
 function toCSV(rows) {
   // ✅ FIX: σωστό regex για νέα γραμμή
-  const escape = (s) => String(s ?? "").replaceAll('"', '""').replace(/\n/g, " ");
+  const escape = (s) => String(s ?? "").replaceAll('"', '""').replace(/
+/g, " ");
   const lines = [HEADERS.join(",")].concat(
     rows.map((r) => HEADERS.map((h) => {
       const val = h === "checkins" ? JSON.stringify(r[h] ?? []) : r[h];
@@ -33,7 +34,8 @@ function toCSV(rows) {
     }).join(","))
   );
   // ✅ FIX: σωστό join για γραμμές
-  return lines.join("\n");
+  return lines.join("
+");
 }
 function download(filename, text) { const blob = new Blob([text], { type: "text/csv;charset=utf-8;" }); const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = filename; link.click(); }
 
@@ -118,7 +120,9 @@ function WoltFieldVisitsApp() {
       try {
         const text = String(reader.result);
         // ✅ FIX: σωστό split σε γραμμές
-        const [headerLine, ...lines] = text.split(/\r?\n/).filter(Boolean);
+        const [headerLine, ...lines] = text.split(/
+?
+/).filter(Boolean);
         const heads = headerLine.split(",").map((h) => h.replace(/(^\"|\"$)/g, ""));
         const parse = (s) => s.replace(/(^\"|\"$)/g, "").replaceAll('""', '"');
         const rows = lines.map((line) => {
